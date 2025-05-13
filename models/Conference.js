@@ -4,7 +4,8 @@ const seatSchema = new mongoose.Schema({
   code: { type: String, required: true },
   reserved: { type: Boolean, default: false },
   reservedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-  qrCode: { type: String, default: null }
+  qrCode: { type: String, default: null },
+  attended: { type: Boolean, default: false }
 }, { _id: false });
 
 const conferenceSchema = new mongoose.Schema({

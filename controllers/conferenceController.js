@@ -306,8 +306,105 @@ const getDeletedConferences = async (req, res) => {
   }
 };
 
+
+
+const getAttendanceList = async (req, res) => {
+  try {
+    const { conferenceId } = req.params;
+
+    const conference = await Conference.findById(conferenceId)
+      .populate('seatMap.reservedBy', 'firstName lastName controlNumber');
+
+    if (!conference) {
+      return res.status(404).json({ message: 'Conferencia no encontrada' });
+    }
+
+    const registeredSeats = conference.seatMap.filter(seat => seat.reserved);
+
+    const attendanceList = registeredSeats.map(seat => ({
+      seatCode: seat.code,
+      attended: seat.attended || false,
+      user: seat.reservedBy
+    }));
+
+    res.json(attendanceList);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener pase de lista', error });
+  }
+};
+
+const markAttendance = async (req, res) => {
+  try {
+    const { conferenceId } = req.params;
+    const { seatCode, attended } = req.body;
+
+    const conference = await Conference.findById(conferenceId);
+    if (!conference) return res.status(404).json({ message: 'Conferencia no encontrada' });
+
+    const seat = conference.seatMap.find(s => s.code === seatCode);
+    if (!seat || !seat.reserved) {
+      return res.status(400).json({ message: 'Asiento no reservado o inválido' });
+    }
+
+    seat.attended = attended;
+    await conference.save();
+
+    res.json({ message: 'Asistencia actualizada', seatCode, attended });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al marcar asistencia', error });
+  }
+};
+
+const validateQrForConference = async (req, res) => {
+  try {
+    const { conferenceId } = req.params;
+    const { qrCode } = req.body;
+
+    const conference = await Conference.findById(conferenceId)
+      .populate('seatMap.reservedBy', 'firstName lastName controlNumber');
+
+    if (!conference) {
+      return res.status(404).json({ message: 'Conferencia no encontrada' });
+    }
+
+    const seat = conference.seatMap.find(s => s.qrCode === qrCode);
+
+    if (!seat) {
+      return res.status(400).json({ message: 'QR inválido o no pertenece a esta conferencia' });
+    }
+
+    if (!seat.reserved) {
+      return res.status(400).json({ message: 'Este asiento no está reservado' });
+    }
+
+    if (seat.attended) {
+      return res.status(409).json({
+        message: '⛔ Este código ya fue escaneado. El usuario ya tiene asistencia registrada.',
+        user: seat.reservedBy,
+        seatCode: seat.code
+      });
+    }
+
+    seat.attended = true;
+    await conference.save();
+
+    res.json({
+      message: '✅ Asistencia registrada correctamente.',
+      user: seat.reservedBy,
+      seatCode: seat.code
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error al validar QR', error });
+  }
+};
+
+
+
+
+
 module.exports = {
-  createConference,
+    createConference,
   registerToConference,
   unregisterFromConference,
   getMyConferences,
@@ -315,5 +412,8 @@ module.exports = {
   getUpcomingConferences,
   updateConference,
   deleteConference,
-  getDeletedConferences
+  getDeletedConferences,
+  getAttendanceList,
+  markAttendance,
+  validateQrForConference     
 };
