@@ -100,6 +100,7 @@ const createConference = async (req, res) => {
 const registerToConference = async (req, res) => {
   const userId = req.user.id;
   const { conferenceId } = req.params;
+  const { seatCode } = req.body; // ✅ ahora recibimos el asiento específico
 
   try {
     const conference = await Conference.findById(conferenceId);
@@ -112,22 +113,27 @@ const registerToConference = async (req, res) => {
       return res.status(400).json({ message: 'Ya estás registrado a esta conferencia' });
     }
 
-    const availableSeat = conference.seatMap.find(seat => !seat.reserved);
-    if (!availableSeat) {
-      return res.status(400).json({ message: 'No hay asientos disponibles' });
+    const seat = conference.seatMap.find(s => s.code === seatCode);
+
+    if (!seat) {
+      return res.status(400).json({ message: `El asiento ${seatCode} no existe.` });
     }
 
-    availableSeat.reserved = true;
-    availableSeat.reservedBy = userId;
-    availableSeat.qrCode = uuidv4();
+    if (seat.reserved) {
+      return res.status(409).json({ message: `El asiento ${seatCode} ya está ocupado.` });
+    }
+
+    seat.reserved = true;
+    seat.reservedBy = userId;
+    seat.qrCode = uuidv4();
 
     await conference.save();
 
     res.status(200).json({
-      message: 'Registro exitoso',
+      message: `Registro exitoso en el asiento ${seatCode}`,
       seat: {
-        code: availableSeat.code,
-        qrCode: availableSeat.qrCode
+        code: seat.code,
+        qrCode: seat.qrCode
       }
     });
   } catch (err) {
@@ -135,6 +141,7 @@ const registerToConference = async (req, res) => {
     res.status(500).json({ message: 'Error al registrarte a la conferencia' });
   }
 };
+
 
 // Cancelar registro
 const unregisterFromConference = async (req, res) => {
