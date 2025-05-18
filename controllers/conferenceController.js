@@ -25,8 +25,10 @@ const createConference = async (req, res) => {
       return res.status(404).json({ message: 'Sala no encontrada' });
     }
 
-    // Calcular fecha de inicio y fin
-    const startDateTime = new Date(`${date}T${time}`);
+    // Calcular fecha de inicio y fin ajustada a la zona local
+    const startDateTimeLocal = new Date(`${date}T${time}`);
+    const timezoneOffset = startDateTimeLocal.getTimezoneOffset() * 60000;
+    const startDateTime = new Date(startDateTimeLocal.getTime() - timezoneOffset);
     const endDateTime = new Date(startDateTime.getTime() + duration * 60000);
 
     // Validar solapamiento
@@ -245,7 +247,9 @@ const updateConference = async (req, res) => {
   const { title, speaker, date, time, duration, topic, posterImage, synopsis } = req.body;
 
   try {
-    const startDateTime = new Date(`${date}T${time}`);
+    const startDateTimeLocal = new Date(`${date}T${time}`);
+    const timezoneOffset = startDateTimeLocal.getTimezoneOffset() * 60000;
+    const startDateTime = new Date(startDateTimeLocal.getTime() - timezoneOffset);
     const endDateTime = new Date(startDateTime.getTime() + duration * 60000);
 
     const conference = await Conference.findById(conferenceId);
@@ -263,9 +267,16 @@ const updateConference = async (req, res) => {
     }
 
     Object.assign(conference, {
-      title, speaker, date, time, duration,
-      topic, posterImage, synopsis,
-      startDateTime, endDateTime
+      title,
+      speaker,
+      date,
+      time,
+      duration,
+      topic,
+      posterImage,
+      synopsis,
+      startDateTime,
+      endDateTime
     });
 
     await conference.save();
@@ -274,6 +285,7 @@ const updateConference = async (req, res) => {
     res.status(500).json({ message: 'Error al actualizar conferencia' });
   }
 };
+
 
 // Eliminar conferencia
 const deleteConference = async (req, res) => {
